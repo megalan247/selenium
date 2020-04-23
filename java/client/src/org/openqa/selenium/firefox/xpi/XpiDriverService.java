@@ -17,13 +17,13 @@
 
 package org.openqa.selenium.firefox.xpi;
 
+import static java.util.Collections.singletonList;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.openqa.selenium.firefox.FirefoxOptions.FIREFOX_OPTIONS;
 import static org.openqa.selenium.firefox.FirefoxProfile.PORT_PREFERENCE;
 
 import com.google.auto.service.AutoService;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.io.ByteStreams;
@@ -79,8 +79,8 @@ public class XpiDriverService extends FirefoxDriverService {
       File executable,
       int port,
       Duration timeout,
-      ImmutableList<String> args,
-      ImmutableMap<String, String> environment,
+      List<String> args,
+      Map<String, String> environment,
       FirefoxBinary binary,
       FirefoxProfile profile,
       File logFile)
@@ -227,13 +227,15 @@ public class XpiDriverService extends FirefoxDriverService {
   }
 
   @Override
-  protected void waitUntilAvailable() throws MalformedURLException {
+  protected void waitUntilAvailable() {
     try {
       // Use a longer timeout, because 45 seconds was the default timeout in the predecessor to
       // XpiDriverService. This has to wait for Firefox to start, not just a service, and some users
       // may be running tests on really slow machines.
       URL status = new URL(getUrl(port).toString() + "/status");
       new UrlChecker().waitUntilAvailable(45, SECONDS, status);
+    } catch (MalformedURLException e) {
+      throw new WebDriverException("Driver server status URL is malformed.", e);
     } catch (UrlChecker.TimeoutException e) {
       throw new WebDriverException("Timed out waiting 45 seconds for Firefox to start.", e);
     }
@@ -408,8 +410,8 @@ public class XpiDriverService extends FirefoxDriverService {
     }
 
     @Override
-    protected ImmutableList<String> createArgs() {
-      return ImmutableList.of("-foreground");
+    protected List<String> createArgs() {
+      return singletonList("-foreground");
     }
 
     @Override
@@ -422,8 +424,8 @@ public class XpiDriverService extends FirefoxDriverService {
         File exe,
         int port,
         Duration timeout,
-        ImmutableList<String> args,
-        ImmutableMap<String, String> environment) {
+        List<String> args,
+        Map<String, String> environment) {
       try {
         return new XpiDriverService(
             exe,

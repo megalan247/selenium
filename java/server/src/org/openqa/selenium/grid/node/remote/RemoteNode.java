@@ -133,6 +133,11 @@ public class RemoteNode extends Node {
   }
 
   @Override
+  public HttpResponse uploadFile(HttpRequest req, Json json, SessionId id) {
+    return client.execute(req);
+  }
+
+  @Override
   public void stop(SessionId id) throws NoSuchSessionException {
     Objects.requireNonNull(id, "Session ID has not been set");
     HttpRequest req = new HttpRequest(DELETE, "/se/grid/node/session/" + id);

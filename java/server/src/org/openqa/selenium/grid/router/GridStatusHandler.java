@@ -96,15 +96,20 @@ class GridStatusHandler implements HttpHandler {
       DistributorStatus status;
       try {
         status = EXECUTOR_SERVICE.submit(new TracedCallable<>(tracer, span, distributor::getStatus)).get(2, SECONDS);
-      } catch (ExecutionException | InterruptedException | TimeoutException e) {
+      } catch (ExecutionException | TimeoutException e) {
         return new HttpResponse().setContent(utf8String(json.toJson(
           ImmutableMap.of("value", ImmutableMap.of(
             "ready", false,
             "message", "Unable to read distributor status.")))));
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        return new HttpResponse().setContent(utf8String(json.toJson(
+          ImmutableMap.of("value", ImmutableMap.of(
+            "ready", false,
+            "message", "Reading distributor status was interrupted.")))));
       }
 
       boolean ready = status.hasCapacity();
-      String message = ready ? "Selenium Grid ready." : "Selenium Grid not ready.";
 
       long remaining = System.currentTimeMillis() + 2000 - start;
       List<Future<Map<String, Object>>> nodeResults = status.getNodes().stream()
@@ -126,13 +131,10 @@ class GridStatusHandler implements HttpHandler {
                 HttpTracing.inject(tracer, span, nodeStatusReq);
                 HttpResponse res = client.execute(nodeStatusReq);
 
-                if (res.getStatus() == 200) {
-                  toReturn.complete(json.toType(string(res), MAP_TYPE));
-                } else {
-                  toReturn.complete(defaultResponse);
-                }
+                toReturn.complete(res.getStatus() == 200
+                                  ? json.toType(string(res), MAP_TYPE)
+                                  : defaultResponse);
               } catch (IOException e) {
-                e.printStackTrace();
                 toReturn.complete(defaultResponse);
               }
             });
@@ -153,19 +155,23 @@ class GridStatusHandler implements HttpHandler {
 
       ImmutableMap.Builder<String, Object> value = ImmutableMap.builder();
       value.put("ready", ready);
-      value.put("message", message);
+      value.put("message", ready ? "Selenium Grid ready." : "Selenium Grid not ready.");
 
       value.put("nodes", nodeResults.stream()
         .map(summary -> {
           try {
             return summary.get();
-          } catch (ExecutionException | InterruptedException e) {
+          } catch (ExecutionException e) {
+            throw wrap(e);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
             throw wrap(e);
           }
         })
         .collect(toList()));
 
-      HttpResponse res = new HttpResponse().setContent(utf8String(json.toJson(ImmutableMap.of("value", value.build()))));
+      HttpResponse res = new HttpResponse().setContent(utf8String(json.toJson(
+          ImmutableMap.of("value", value.build()))));
       HTTP_RESPONSE.accept(span, res);
       return res;
     } finally {
