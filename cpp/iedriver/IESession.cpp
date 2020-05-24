@@ -24,6 +24,8 @@
 #include "messages.h"
 #include "StringUtilities.h"
 #include "WebDriverConstants.h"
+#include <random>
+#include <string>
 
 #define MUTEX_NAME L"WD_INITIALIZATION_MUTEX"
 #define MUTEX_WAIT_TIMEOUT 30000
@@ -39,6 +41,23 @@ IESession::IESession() {
 }
 
 IESession::~IESession(void) {
+}
+
+std::string random_string(std::string::size_type length) {
+  static auto& chrs = "0123456789"
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+  thread_local static std::mt19937 rg{ std::random_device{}() };
+  thread_local static std::uniform_int_distribution<std::string::size_type> pick(0, sizeof(chrs) - 2);
+
+  std::string s;
+
+  s.reserve(length);
+
+  while (length--)
+    s += chrs[pick(rg)];
+
+  return s;
 }
 
 void IESession::Initialize(void* init_params) {
@@ -106,7 +125,8 @@ void IESession::Initialize(void* init_params) {
     LOG(TRACE) << "Created thread for command executor returns HWND: '" << thread_context.hwnd << "'";
     std::vector<wchar_t> window_text_buffer(37);
     ::GetWindowText(thread_context.hwnd, &window_text_buffer[0], 37);
-    session_id = StringUtilities::ToString(&window_text_buffer[0]);
+    // session_id = StringUtilities::ToString(&window_text_buffer[0]);
+    session_id = random_string(36);
     LOG(TRACE) << "Session id is retrived from command executor window: '" << session_id << "'";
   } else {
     LOG(DEBUG) << "Created thread does not return HWND of created session";
