@@ -45,6 +45,8 @@
 #include "Script.h"
 #include "WebDriverConstants.h"
 #include "WindowUtilities.h"
+#include <random>
+#include <string>
 
 #define MAX_HTML_DIALOG_RETRIES 5
 #define WAIT_TIME_IN_MILLISECONDS 50
@@ -54,6 +56,23 @@
 #define DEFAULT_BROWSER_REATTACH_TIMEOUT_IN_MILLISECONDS 10000
 
 namespace webdriver {
+
+  std::string random_string_another(std::string::size_type length) {
+    static auto& chrs = "0123456789"
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+    thread_local static std::mt19937 rg{ std::random_device{}() };
+    thread_local static std::uniform_int_distribution<std::string::size_type> pick(0, sizeof(chrs) - 2);
+
+    std::string s;
+
+    s.reserve(length);
+
+    while (length--)
+      s += chrs[pick(rg)];
+
+    return s;
+  }
 
 struct WaitThreadContext {
   HWND window_handle;
@@ -89,7 +108,7 @@ LRESULT IECommandExecutor::OnCreate(UINT uMsg,
   wchar_t* cast_guid_string = reinterpret_cast<wchar_t*>(guid_string);
   this->SetWindowText(cast_guid_string);
 
-  std::string session_id = StringUtilities::ToString(cast_guid_string);
+  std::string session_id = random_string_another(36);
   this->session_id_ = session_id;
   this->is_valid_ = true;
 
